@@ -1,0 +1,24 @@
+version: '3'
+services:
+  db:
+    image: mdillon/postgis:9.6-alpine
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+    ports:
+      - ${DB_PORT_MIGRATION}:5432
+    expose:
+      - 5432
+  fseopt:
+    restart: always
+    build: .
+    environment:
+      - FSEOPT_CONNECTION_STRING=${FSEOPT_CONNECTION_STRING}
+      - FSEOPT_FSE_USER_KEY=${FSEOPT_FSE_USER_KEY}
+    command: fseopt
+    depends_on:
+      - db
+    ports: 
+      - 8001:8989 
+    expose:
+     - 8989
