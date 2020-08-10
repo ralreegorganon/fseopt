@@ -10,11 +10,10 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/mattes/migrate"
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/ralreegorganon/fseopt"
-
-	_ "github.com/mattes/migrate/database/postgres"
-	_ "github.com/mattes/migrate/source/file"
 )
 
 var version = flag.Bool("version", false, "Print version")
