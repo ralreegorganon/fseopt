@@ -45,39 +45,46 @@ func (db *DB) UpdateAssignments() error {
 
 	assignments := map[int64]Assignment{}
 
-	var icaos string
-
-	err := db.Get(&icaos, `
-		select string_agg(icao, '-' order by icao) from airport where state in ('Washington', 'Alaska') limit 1
-	`)
-	if err != nil {
-		return err
+	// Grouped to minimize the number of requests while maximizing data retrieved
+	states := []string{
+		"'Alaska', 'Nevada','British Columbia'",
+		"'California', 'Oregon'",
+		"'Washington', 'Idaho', 'Wyoming', 'Arizona', 'Utah'",
 	}
 
-	urls := []string{
-		"http://server.fseconomy.net/data?userkey=" + db.FSEUserKey + "&format=xml&query=icao&search=jobsto&icaos=" + icaos,
-		"http://server.fseconomy.net/data?userkey=" + db.FSEUserKey + "&format=xml&query=icao&search=jobsfrom&icaos=" + icaos,
-	}
+	for _, state := range states {
+		var icaos string
 
-	for _, url := range urls {
-		resp, err := c.Get(url)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-		body, err := ioutil.ReadAll(resp.Body)
+		err := db.Get(&icaos, "select string_agg(icao, '-' order by icao) from airport where state in ("+state+") limit 1")
 		if err != nil {
 			return err
 		}
 
-		var to JobContainer
-		err = xml.Unmarshal(body, &to)
-		if err != nil {
-			return err
+		urls := []string{
+			"http://server.fseconomy.net/data?userkey=" + db.FSEUserKey + "&format=xml&query=icao&search=jobsto&icaos=" + icaos,
+			"http://server.fseconomy.net/data?userkey=" + db.FSEUserKey + "&format=xml&query=icao&search=jobsfrom&icaos=" + icaos,
 		}
 
-		for _, a := range to.Assignments {
-			assignments[a.ID] = a
+		for _, url := range urls {
+			resp, err := c.Get(url)
+			if err != nil {
+				return err
+			}
+			defer resp.Body.Close()
+			body, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				return err
+			}
+
+			var to JobContainer
+			err = xml.Unmarshal(body, &to)
+			if err != nil {
+				return err
+			}
+
+			for _, a := range to.Assignments {
+				assignments[a.ID] = a
+			}
 		}
 	}
 
@@ -150,9 +157,9 @@ func (db *DB) UpdateAircraft() error {
 
 	urls := []string{
 		"https://server.fseconomy.net/data?userkey=" + db.FSEUserKey + "&format=xml&query=aircraft&search=makemodel&makemodel=Quest%20Kodiak",
-		// "https://server.fseconomy.net/data?userkey=" + db.FSEUserKey + "&format=xml&query=aircraft&search=makemodel&makemodel=Eclipse%20500",
-		// "https://server.fseconomy.net/data?userkey=" + db.FSEUserKey + "&format=xml&query=aircraft&search=makemodel&makemodel=Pilatus%20PC-12",
-		// "https://server.fseconomy.net/data?userkey=" + db.FSEUserKey + "&format=xml&query=aircraft&search=makemodel&makemodel=Socata%20TBM%20850",
+		"https://server.fseconomy.net/data?userkey=" + db.FSEUserKey + "&format=xml&query=aircraft&search=makemodel&makemodel=Eclipse%20500",
+		"https://server.fseconomy.net/data?userkey=" + db.FSEUserKey + "&format=xml&query=aircraft&search=makemodel&makemodel=Pilatus%20PC-12",
+		"https://server.fseconomy.net/data?userkey=" + db.FSEUserKey + "&format=xml&query=aircraft&search=makemodel&makemodel=Socata%20TBM%20850",
 	}
 
 	for _, url := range urls {
