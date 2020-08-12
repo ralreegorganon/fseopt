@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -155,14 +156,16 @@ func (db *DB) UpdateAircraft() error {
 
 	aircraft := map[int64]Aircraft{}
 
-	urls := []string{
-		"https://server.fseconomy.net/data?userkey=" + db.FSEUserKey + "&format=xml&query=aircraft&search=makemodel&makemodel=Quest%20Kodiak",
-		"https://server.fseconomy.net/data?userkey=" + db.FSEUserKey + "&format=xml&query=aircraft&search=makemodel&makemodel=Eclipse%20500",
-		"https://server.fseconomy.net/data?userkey=" + db.FSEUserKey + "&format=xml&query=aircraft&search=makemodel&makemodel=Pilatus%20PC-12",
-		"https://server.fseconomy.net/data?userkey=" + db.FSEUserKey + "&format=xml&query=aircraft&search=makemodel&makemodel=Socata%20TBM%20850",
+	var makes []string
+
+	err := db.Select(&makes, "select make_model from aircraft_stat where query = true")
+	if err != nil {
+		return err
 	}
 
-	for _, url := range urls {
+	for _, make := range makes {
+
+		url := "https://server.fseconomy.net/data?userkey=" + db.FSEUserKey + "&format=xml&query=aircraft&search=makemodel&makemodel=" + url.QueryEscape(make)
 		resp, err := c.Get(url)
 		if err != nil {
 			return err
