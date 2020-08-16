@@ -16,8 +16,9 @@ func CreateRouter(server *HTTPServer) (*mux.Router, error) {
 			"/api/aircraft":    server.GetAircraft,
 		},
 		"POST": {
-			"/api/assignments": server.UpdateAssignments,
-			"/api/aircraft":    server.UpdateAircraft,
+			"/api/assignments":                  server.UpdateAssignments,
+			"/api/aircraft":                     server.UpdateAircraft,
+			"/api/from-assignments-by-aircraft": server.FromAssignmentsByAircraft,
 		},
 		"PUT": {},
 		"OPTIONS": {
@@ -120,6 +121,18 @@ func (s *HTTPServer) GetAssignments(w http.ResponseWriter, r *http.Request, vars
 
 func (s *HTTPServer) UpdateAssignments(w http.ResponseWriter, r *http.Request, vars map[string]string) error {
 	err := s.DB.UpdateAssignments()
+
+	if err != nil {
+		return err
+	}
+
+	w.WriteHeader(http.StatusOK)
+
+	return nil
+}
+
+func (s *HTTPServer) FromAssignmentsByAircraft(w http.ResponseWriter, r *http.Request, vars map[string]string) error {
+	err := s.DB.FromAssignmentsByAircraft()
 
 	if err != nil {
 		return err

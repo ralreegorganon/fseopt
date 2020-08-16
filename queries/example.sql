@@ -21,12 +21,13 @@ assignments_and_locations as
 		inner join airport t
 			on a.to_icao = t.icao
 	where
-		unit_type = 'passengers'
+		1=1
+--		and unit_type = 'passengers'
 		and type != 'All-In'
 ),
 ac as
 (
-	select 
+	select
 		a.make_model,
 		r.from_icao,
 		r.to_icao,
@@ -35,6 +36,7 @@ ac as
 		round(((st_distance(r.from_geog, aa.the_geog) - st_distance(r.to_geog, aa.the_geog)) / 1852 / 100 * a.bonus)) flight_bonus,
 		r.pay,
 		r.amount,
+		r.unit_type,
 		a.registration,
 		a.home,
 		a.rental_dry,
@@ -47,7 +49,9 @@ ac as
 		round(st_distance(r.to_geog, aa.the_geog) / 1852) after_distance,
 		s.cost_per_nm as cost_per_mile,
 		s.cruise,
-		s.max_pax
+		s.max_pax,
+		s.cargo_25,
+		s.cargo_100
 	from 
 		assignments_and_locations r
 		inner join aircraft a
@@ -61,12 +65,24 @@ ac as
 		and (a.rental_dry > 0 or a.rental_wet > 0)
 		and rented_by = 'Not rented.'
 		and equipment = 'IFR/AP/GPS'
-		and amount <= s.max_pax 
+		and 
+		(
+			(
+				amount <= s.max_pax
+				and unit_type = 'passengers'
+			)
+			or
+			(
+				amount <= s.cargo_25
+				and unit_type = 'kg'
+			)
+		)
 ),
 mathed as
 (
 	select
 		make_model,
+		registration,
 		from_icao,
 		to_icao,
 		distance,
@@ -79,9 +95,12 @@ mathed as
 		flight_bonus,
 		pay,
 		amount,
+		unit_type,
 		type,
 		pt_assignment,
 		max_pax,
+		cargo_25,
+		cargo_100,
 		home,
 		before_distance,
 		after_distance
@@ -91,6 +110,7 @@ rental as
 (
 	select
 		make_model,
+		registration,
 		from_icao,
 		to_icao,
 		distance,
@@ -110,9 +130,12 @@ rental as
 		flight_bonus,
 		pay,
 		amount,
+		unit_type,
 		type,
 		pt_assignment,
 		max_pax,
+		cargo_25,
+		cargo_100,
 		home,
 		before_distance,
 		after_distance
@@ -123,6 +146,7 @@ trip as
 (
 	select
 		make_model,
+		registration,
 		from_icao,
 		to_icao,
 		distance,
@@ -132,12 +156,15 @@ trip as
 		-1*rental_cost + flight_bonus as route_net,
 		pay,
 		amount,
-		sum(pay) over (partition by make_model, from_icao, to_icao, type) as total_pay,
-		sum(amount) over (partition by make_model, from_icao, to_icao, type) as total_amount,
-		sum(case when pt_assignment = true then 1 else 0 end) over (partition by make_model, from_icao, to_icao, type) as pt_count,
+		unit_type,
+		sum(pay) over (partition by make_model, registration, from_icao, to_icao, type, unit_type) as total_pay,
+		sum(amount) over (partition by make_model, registration, from_icao, to_icao, type, unit_type) as total_amount,
+		sum(case when pt_assignment = true then 1 else 0 end) over (partition by make_model, registration, from_icao, to_icao, type, unit_type) as pt_count,
 		type,
 		pt_assignment,
 		max_pax,
+		cargo_25,
+		cargo_100,
 		home,
 		before_distance,
 		after_distance
@@ -148,6 +175,7 @@ outcomes as
 (
 	select 
 		make_model,
+		registration,
 		from_icao,
 		to_icao,
 		distance,
@@ -159,9 +187,12 @@ outcomes as
 		route_net,
 		pay,
 		amount,
+		unit_type,
 		total_pay,
 		total_amount,
 		max_pax,
+		cargo_25,
+		cargo_100,
 		pt_count,
 		home,
 		before_distance,
@@ -176,7 +207,7 @@ outcomes as
 select * from outcomes
 where 
 1=1
-and make_model = 'Socata TBM 850'
+--and make_model = 'Fairchild C119'
 --and from_icao = 'PASV' and to_icao = 'PANC'
 --and distance < 300
 --and distance > 30
@@ -186,4 +217,6 @@ and make_model = 'Socata TBM 850'
 --and total_amount <= max_pax
 --and est_minutes < 20
 --and best_net_hourly > 3000
-order by pay desc
+and unit_type = 'kg'
+and total_amount <= cargo_100
+order by best_net desc
