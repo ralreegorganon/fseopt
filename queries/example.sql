@@ -131,6 +131,7 @@ rental as
 		pay,
 		amount,
 		unit_type,
+		case when type = 'Trip-Only' then 0 else row_number() over (order by type) end c,
 		type,
 		pt_assignment,
 		max_pax,
@@ -157,9 +158,9 @@ trip as
 		pay,
 		amount,
 		unit_type,
-		sum(pay) over (partition by make_model, registration, from_icao, to_icao, type, unit_type) as total_pay,
-		sum(amount) over (partition by make_model, registration, from_icao, to_icao, type, unit_type) as total_amount,
-		sum(case when pt_assignment = true then 1 else 0 end) over (partition by make_model, registration, from_icao, to_icao, type, unit_type) as pt_count,
+		sum(pay) over (partition by make_model, registration, from_icao, to_icao, c, unit_type) as total_pay,
+		sum(amount) over (partition by make_model, registration, from_icao, to_icao, c, unit_type) as total_amount,
+		sum(case when pt_assignment = true then 1 else 0 end) over (partition by make_model, registration, from_icao, to_icao, c, unit_type) as pt_count,
 		type,
 		pt_assignment,
 		max_pax,
@@ -208,7 +209,8 @@ select * from outcomes
 where 
 1=1
 --and make_model = 'Fairchild C119'
---and from_icao = 'PASV' and to_icao = 'PANC'
+--and from_icao = 'FAJS' 
+--and to_icao = 'PANC'
 --and distance < 300
 --and distance > 30
 --and total_pay > 4000
@@ -217,6 +219,5 @@ where
 --and total_amount <= max_pax
 --and est_minutes < 20
 --and best_net_hourly > 3000
-and unit_type = 'kg'
-and total_amount <= cargo_100
+and ((unit_type = 'kg' and total_amount <= cargo_100) or (unit_type = 'passengers' and total_amount <= max_pax))
 order by best_net desc
