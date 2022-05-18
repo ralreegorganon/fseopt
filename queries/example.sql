@@ -1,4 +1,5 @@
-with 
+with
+recursive
 assignments_and_locations as
 (
 	select
@@ -52,12 +53,12 @@ ac as
 		s.max_pax,
 		s.cargo_25,
 		s.cargo_100
-	from 
+	from
 		assignments_and_locations r
 		inner join aircraft a
 			on a.location = r.from_icao
 		inner join airport aa
-			on a.home = aa.icao 
+			on a.home = aa.icao
 		inner join aircraft_stat s
 			on a.make_model = s.make_model
 	where
@@ -65,7 +66,7 @@ ac as
 		and (a.rental_dry > 0 or a.rental_wet > 0)
 		and rented_by = 'Not rented.'
 		and equipment = 'IFR/AP/GPS'
-		and 
+		and
 		(
 			(
 				amount <= s.max_pax
@@ -117,14 +118,14 @@ rental as
 		cruise,
 		est_minutes,
 		fuel_pct,
-		case 
+		case
 			when est_wet = 0 then est_dry
-			when est_wet < est_dry then est_wet 
+			when est_wet < est_dry then est_wet
 			else est_dry
 		end rental_cost,
-		case 
+		case
 			when est_wet = 0 then 'dry'
-			when est_wet < est_dry then 'wet' 
+			when est_wet < est_dry then 'wet'
 			else 'dry'
 		end rental_type,
 		flight_bonus,
@@ -140,12 +141,13 @@ rental as
 		home,
 		before_distance,
 		after_distance
-	from 
+	from
 		mathed
 ),
 trip as
 (
 	select
+		rental_type,
 		make_model,
 		registration,
 		from_icao,
@@ -158,10 +160,8 @@ trip as
 		pay,
 		amount,
 		unit_type,
-		sum(pay) over (partition by make_model, registration, from_icao, to_icao, c, unit_type) as total_pay,
-		sum(amount) over (partition by make_model, registration, from_icao, to_icao, c, unit_type) as total_amount,
-		sum(case when pt_assignment = true then 1 else 0 end) over (partition by make_model, registration, from_icao, to_icao, c, unit_type) as pt_count,
 		type,
+		c as special_type,
 		pt_assignment,
 		max_pax,
 		cargo_25,
@@ -169,12 +169,64 @@ trip as
 		home,
 		before_distance,
 		after_distance
-	from 
+	from
 		rental
 ),
-outcomes as
+idassigned as
 (
-	select 
+	select
+		cast(row_number() over (order by registration, from_icao, to_icao, unit_type, amount) as varchar) as id,
+		dense_rank() over (order by registration, from_icao, to_icao, special_type) as group_id,
+		case when unit_type = 'kg' then amount else amount * 77 end as weight_cost,
+		pay::numeric::money || ' / ' || amount || ' ' || unit_type || ' / ' || type as uniqueid,
+		*
+	from
+		trip
+),
+builtlist(id, group_id, picked_items, picked_item_names, nr_items, total_weight, total_value, total_pt, total_pax, cargo_25, max_pax) as
+(
+	select
+		id,
+		group_id,
+		ARRAY[id] as picked_items,
+		ARRAY[uniqueid] as picked_item_names,
+		1 as nr_items,
+		weight_cost as total_weight,
+		pay as total_value,
+		case when pt_assignment = true then 1 else 0 end as total_pt,
+		case when unit_type = 'passengers' then amount else 0 end as total_pax,
+		cargo_25,
+		max_pax
+	from
+		idassigned
+	union all
+	select
+        i.id,
+        i.group_id,
+        picked_items || i.id,
+        picked_item_names || i.uniqueid,
+        nr_items + 1,
+        weight_cost + total_weight,
+        pay + total_value,
+        case when pt_assignment = true then 1 else 0 end + total_pt,
+        case when unit_type = 'passengers' then amount else 0 end + total_pax,
+        i.cargo_25,
+        i.max_pax
+    from
+    	idassigned i
+    	inner join builtlist b
+    		on i.group_id = b.group_id
+    where
+    	picked_items::varchar[] @> ARRAY[i.id] = false
+        and weight_cost + total_weight <= i.cargo_25
+        and case when unit_type = 'passengers' then amount else 0 end + total_pax <= i.max_pax
+        and i.id > b.id
+),
+group_attributes as
+(
+	select
+		group_id,
+		rental_type,
 		make_model,
 		registration,
 		from_icao,
@@ -183,41 +235,109 @@ outcomes as
 		cruise,
 		est_minutes,
 		fuel_pct,
-		type,
-		pt_assignment,
 		route_net,
-		pay,
-		amount,
-		unit_type,
-		total_pay,
-		total_amount,
 		max_pax,
 		cargo_25,
 		cargo_100,
-		pt_count,
 		home,
 		before_distance,
-		after_distance,
-		round(pay * 0.9 + route_net) as worst_net,
-		round(total_pay * 0.9 + route_net - (case when pt_count > 5 then total_pay * 0.01 * pt_count - 5 else 0 end)) as best_net,
-		round((pay * 0.9 + route_net) / greatest(1, est_minutes) * 60) as worst_net_hourly,
-		round((total_pay * 0.9 + route_net - (case when pt_count > 5 then total_pay * 0.01 * pt_count - 5 else 0 end)) / greatest(1, est_minutes) * 60) as best_net_hourly
-	from 
-		trip
+		after_distance
+	from
+		idassigned
+	group by
+		group_id,
+		rental_type,
+		make_model,
+		registration,
+		from_icao,
+		to_icao,
+		distance,
+		cruise,
+		est_minutes,
+		fuel_pct,
+		route_net,
+		max_pax,
+		cargo_25,
+		cargo_100,
+		home,
+		before_distance,
+		after_distance
+),
+optimized as
+(
+	select
+		ga.rental_type,
+		ga.make_model,
+		ga.registration,
+		ga.from_icao,
+		ga.to_icao,
+		b.total_weight,
+		b.total_value as total_pay,
+		b.total_pt,
+		b.total_pax,
+		ga.distance,
+		ga.cruise,
+		ga.est_minutes,
+		ga.fuel_pct,
+		ga.route_net,
+		ga.max_pax,
+		ga.cargo_25,
+		ga.cargo_100,
+		ga.home,
+		ga.before_distance,
+		ga.after_distance,
+		b.picked_item_names
+	from
+		builtlist b
+		inner join group_attributes ga
+			on b.group_id = ga.group_id
+),
+outcomes as
+(
+	select
+		*,
+		round(total_pay * 0.9 + route_net - (case when total_pt > 5 then total_pay * 0.01 * total_pt - 5 else 0 end)) as best_net,
+		round((total_pay * 0.9 + route_net - (case when total_pt > 5 then total_pay * 0.01 * total_pt - 5 else 0 end)) / greatest(1, est_minutes) * 60) as best_net_hourly
+	from
+		optimized
+),
+jsonsubset as
+(
+	select
+		make_model,
+		registration,
+		rental_type,
+		from_icao,
+		to_icao,
+		fuel_pct,
+		distance,
+		est_minutes,
+		total_weight,
+		total_pay,
+		best_net,
+		best_net_hourly,
+		picked_item_names as assignments
+	from
+		outcomes
+	where
+		1=1
+		--and make_model = 'Fairchild C119'
+		--and from_icao = 'FAJS'
+		--and to_icao = 'PANC'
+		--and distance < 300
+		--and distance > 30
+		--and total_pay > 4000
+		--and from_icao = 'PAKN'
+		--and make_model = 'Quest Kodiak'
+		--and total_amount <= max_pax
+		and est_minutes < 30
+		--and best_net_hourly > 3000
+	order by
+		best_net desc
+	limit 20
 )
-select * from outcomes
-where 
-1=1
---and make_model = 'Fairchild C119'
---and from_icao = 'FAJS' 
---and to_icao = 'PANC'
---and distance < 300
---and distance > 30
---and total_pay > 4000
---and from_icao = 'PAKN'
---and make_model = 'Quest Kodiak'
---and total_amount <= max_pax
---and est_minutes < 20
---and best_net_hourly > 3000
-and ((unit_type = 'kg' and total_amount <= cargo_100) or (unit_type = 'passengers' and total_amount <= max_pax))
-order by best_net desc
+select
+	--json_agg(jsonsubset)
+	*
+from
+	jsonsubset

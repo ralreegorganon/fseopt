@@ -18,8 +18,11 @@ insert into aircraft_stat (make_model, cost_per_nm, cruise, max_pax, cargo_25, c
 insert into aircraft_stat (make_model, cost_per_nm, cruise, max_pax, cargo_25, cargo_100, padding_minutes, query) values ('Douglas DC-3', 2.99, 140, 26, 3813, 2192, 0, false);
 insert into aircraft_stat (make_model, cost_per_nm, cruise, max_pax, cargo_25, cargo_100, padding_minutes, query) values ('DeHavilland DHC-6 300 Twin Otter (Aerosoft Extended)', 1.43, 170, 19, 1946, 1035, 0, false);
 insert into aircraft_stat (make_model, cost_per_nm, cruise, max_pax, cargo_25, cargo_100, padding_minutes, query) values ('Fairchild C119', 2.65, 200, 65, 14048, 12838, 0, false);
-insert into aircraft_stat (make_model, cost_per_nm, cruise, max_pax, cargo_25, cargo_100, padding_minutes, query) values ('Cessna 208 Caravan', 1.23, 182, 13, 1610, 941, 0, true);
-insert into aircraft_stat (make_model, cost_per_nm, cruise, max_pax, cargo_25, cargo_100, padding_minutes, query) values ('Beechcraft King Air 350', 1.38, 258, 14, 2241, 1153, 0, true);
-insert into aircraft_stat (make_model, cost_per_nm, cruise, max_pax, cargo_25, cargo_100, padding_minutes, query) values ('Socata TBM 930 (MSFS)', 0.76, 295, 7, 981, 392, 0, true);
-insert into aircraft_stat (make_model, cost_per_nm, cruise, max_pax, cargo_25, cargo_100, padding_minutes, query) values ('Cessna Citation CJ4 (MSFS)', 1.67, 400, 10, 2443, 710, 0, true);
-insert into aircraft_stat (make_model, cost_per_nm, cruise, max_pax, cargo_25, cargo_100, padding_minutes, query) values ('Cessna Citation Longitude', 2.31, 465, 8, 5406, 1052, 0, true);
+insert into aircraft_stat (make_model, cost_per_nm, cruise, max_pax, cargo_25, cargo_100, padding_minutes, query) values ('Cessna 208 Caravan', 1.23, 182, 13, 1610, 941, 0, false);
+insert into aircraft_stat (make_model, cost_per_nm, cruise, max_pax, cargo_25, cargo_100, padding_minutes, query) values ('Beechcraft King Air 350', 1.38, 258, 14, 2241, 1153, 0, false);
+insert into aircraft_stat (make_model, cost_per_nm, cruise, max_pax, cargo_25, cargo_100, padding_minutes, query) values ('Socata TBM 930 (MSFS)', 0.76, 295, 7, 981, 392, 0, false);
+insert into aircraft_stat (make_model, cost_per_nm, cruise, max_pax, cargo_25, cargo_100, padding_minutes, query) values ('Cessna Citation CJ4 (MSFS)', 1.67, 400, 10, 2443, 710, 0, false);
+insert into aircraft_stat (make_model, cost_per_nm, cruise, max_pax, cargo_25, cargo_100, padding_minutes, query) values ('Cessna Citation Longitude', 2.31, 465, 8, 5406, 1052, 0, false);
+insert into aircraft_stat (make_model, cost_per_nm, cruise, max_pax, cargo_25, cargo_100, padding_minutes, query) values ('Douglas DC-6B (PMDG)', 6.86, 225, 89, 19860, 13165, 0, false);
+insert into aircraft_stat (make_model, cost_per_nm, cruise, max_pax, cargo_25, cargo_100, padding_minutes, query) values ('Cessna 310', 0.68, 156, 5, 742, 372, 0, false);
+insert into aircraft_stat (make_model, cost_per_nm, cruise, max_pax, cargo_25, cargo_100, padding_minutes, query) values ('BAe 146-100 (Avro RJ70)', 4.83, 420, 82, 12170, 6124, 0, false);
