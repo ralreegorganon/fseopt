@@ -183,6 +183,43 @@ idassigned as
 	from
 		trip
 ),
+naivesum as
+(
+	select 
+		group_id, 
+		array_agg(uniqueid) as picked_item_names,
+		sum(weight_cost) as total_weight, 
+		sum(case when unit_type = 'passengers' then amount else 0 end) as total_pax,
+		sum(case when pt_assignment = true then 1 else 0 end) as total_pt,
+		sum(pay) as total_pay,
+		cargo_25,
+		max_pax
+	from 
+		idassigned
+	group by
+		group_id,
+		cargo_25,
+		max_pax
+),
+nothingelserequired as
+(
+	select 
+		group_id,
+		total_weight,
+		total_pay,
+		total_pt,
+		total_pax,	
+		picked_item_names
+	from 
+		naivesum 
+	where 
+		total_weight <= cargo_25 
+		and total_pax <= max_pax
+),
+toprocess as
+(
+	select * from idassigned where group_id in (select group_id from naivesum where total_weight > cargo_25 or total_pax > max_pax)
+),
 builtlist(id, group_id, picked_items, picked_item_names, nr_items, total_weight, total_value, total_pt, total_pax, cargo_25, max_pax) as
 (
 	select
@@ -198,7 +235,7 @@ builtlist(id, group_id, picked_items, picked_item_names, nr_items, total_weight,
 		cargo_25,
 		max_pax
 	from
-		idassigned
+		toprocess
 	union all
 	select
         i.id,
@@ -213,7 +250,7 @@ builtlist(id, group_id, picked_items, picked_item_names, nr_items, total_weight,
         i.cargo_25,
         i.max_pax
     from
-    	idassigned i
+    	toprocess i
     	inner join builtlist b
     		on i.group_id = b.group_id
     where
@@ -291,6 +328,33 @@ optimized as
 		builtlist b
 		inner join group_attributes ga
 			on b.group_id = ga.group_id
+	union all 
+	select
+		ga.rental_type,
+		ga.make_model,
+		ga.registration,
+		ga.from_icao,
+		ga.to_icao,
+		b.total_weight,
+		b.total_pay,
+		b.total_pt,
+		b.total_pax,
+		ga.distance,
+		ga.cruise,
+		ga.est_minutes,
+		ga.fuel_pct,
+		ga.route_net,
+		ga.max_pax,
+		ga.cargo_25,
+		ga.cargo_100,
+		ga.home,
+		ga.before_distance,
+		ga.after_distance,
+		b.picked_item_names
+	from
+		nothingelserequired b
+		inner join group_attributes ga
+			on b.group_id = ga.group_id
 ),
 outcomes as
 (
@@ -330,11 +394,10 @@ jsonsubset as
 		--and from_icao = 'PAKN'
 		--and make_model = 'Quest Kodiak'
 		--and total_amount <= max_pax
-		and est_minutes < 30
+		--and est_minutes < 30
 		--and best_net_hourly > 3000
 	order by
 		best_net desc
-	limit 20
 )
 select
 	--json_agg(jsonsubset)
